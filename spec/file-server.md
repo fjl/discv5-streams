@@ -11,8 +11,8 @@ Requesting a file transfer is a multi-step process. The client (`A`) first signa
 intent to download a specific file in a TALKREQ message. The server (`B`) confirms or
 denies the initial request using TALKRESP.
 
-    A -> B  TALKREQ  "xfer-init" <file-name>
-    A <- B  TALKRESP ok <xfer-id>
+    A -> B  TALKREQ  "xfer-init" [ xfer-id, file-name ]
+    A <- B  TALKRESP [ ok ]
 
 Note that the session hasn't started yet. The server now locates the file and sends a
 'start' request back. This step exists because discv5 has a very short response timeout
@@ -20,8 +20,8 @@ Note that the session hasn't started yet. The server now locates the file and se
 slow file system, or when rate-limiting is applied). During this round of
 TALKREQ/TALKRESP, session secrets are exchanged.
 
-    A <- B  TALKREQ  "xfer-start" <xfer-id> <initiator-secret> <file-size>
-    A -> B  TALKRESP ok <recipient-secret>
+    A <- B  TALKREQ  "xfer-start" [ xfer-id, initiator-secret, file-size ]
+    A -> B  TALKRESP [ ok, recipient-secret ]
 
 The server's earlier TALKRESP message and the subsequent TALKREQ might arrive out of
 order. The client must wait for both messages to arrive before sending its TALKRESP.
