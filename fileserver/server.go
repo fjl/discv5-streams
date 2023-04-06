@@ -6,7 +6,6 @@ import (
 	"io"
 	"net"
 	"net/netip"
-	"sync"
 
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p/enode"
@@ -103,13 +102,10 @@ type FileTransferRequest struct {
 	xferID   uint16
 	server   *Server
 
-	mu         sync.Mutex
 	acceptInit chan bool
 }
 
 func (r *FileTransferRequest) Accept() error {
-	r.mu.Lock()
-	defer r.mu.Unlock()
 	if r.acceptInit == nil {
 		return errAlreadyAccepted
 	}
@@ -119,8 +115,6 @@ func (r *FileTransferRequest) Accept() error {
 }
 
 func (r *FileTransferRequest) SendFile(size uint64, reader io.Reader) error {
-	r.mu.Lock()
-	defer r.mu.Unlock()
 	if r.acceptInit != nil {
 		return errNotAccepted
 	}
@@ -135,9 +129,6 @@ func (r *FileTransferRequest) SendFile(size uint64, reader io.Reader) error {
 }
 
 func (r *FileTransferRequest) startSession(fileSize uint64) (io.Writer, error) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
 	initiator, err := r.server.host.SessionStore.Initiator(r.server.cfg.Prefix)
 	if err != nil {
 		return nil, err
