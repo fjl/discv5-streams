@@ -246,7 +246,14 @@ func (c *Client) handleXferStart(node enode.ID, addr *net.UDPAddr, reqBytes []by
 	accept := make(chan *clientTransfer, 1)
 	c.start <- clientStartEv{node, req, accept}
 
-	transfer := <-accept
+	var transfer *clientTransfer
+	timeoutTimer := time.NewTimer(400 * time.Millisecond)
+	defer timeoutTimer.Stop()
+	select {
+	case transfer = <-accept:
+	case <-timeoutTimer.C:
+		fmt.Println("accept timeout")
+	}
 	if transfer == nil {
 		// Canceled or timed out.
 		return encodeXferStartResponse(false, [16]byte{})
