@@ -42,13 +42,13 @@ func NewStore() *Store {
 
 // Initiator is called by the session initiator to start key agreement.
 // The returned initatorSec must be sent to the recipient.
-func (st *Store) Initiator(protocol string) (i *InitiatorState, initiatorSec [16]byte, err error) {
+func (st *Store) Initiator(protocol string) (i *InitiatorState, err error) {
 	i = &InitiatorState{st: st, protocol: protocol}
 	_, err = io.ReadFull(crand.Reader, i.initiatorSec[:])
 	if err != nil {
-		return nil, i.initiatorSec, err
+		return nil, err
 	}
-	return i, i.initiatorSec, nil
+	return i, nil
 }
 
 // InitiatorState is the initiator's session establishment state.
@@ -56,6 +56,11 @@ type InitiatorState struct {
 	st           *Store
 	protocol     string
 	initiatorSec [16]byte
+}
+
+// Secret returns the initiator secret.
+func (i *InitiatorState) Secret() [16]byte {
+	return i.initiatorSec
 }
 
 // Establish creates the session.

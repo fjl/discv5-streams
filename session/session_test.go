@@ -16,11 +16,11 @@ func TestSessionRoundtrip(t *testing.T) {
 	)
 
 	// Run key agreement with st1 as initiator and st2 as recipient.
-	i, isec, err := st1.Initiator("proto")
+	i, err := st1.Initiator("proto")
 	if err != nil {
 		t.Fatal(err)
 	}
-	rs, rsec, err := st2.Recipient(ip1, "proto", isec)
+	rs, rsec, err := st2.Recipient(ip1, "proto", i.Secret())
 	if err != nil {
 		t.Fatal(err)
 	}
