@@ -10,11 +10,18 @@ require (
 )
 
 require (
+	github.com/anacrolix/missinggo v1.3.0 // indirect
+	github.com/anacrolix/missinggo/perf v1.0.0 // indirect
+	github.com/anacrolix/missinggo/v2 v2.5.1 // indirect
+	github.com/anacrolix/sync v0.4.0 // indirect
+	github.com/brendoncarroll/stdctx v0.0.0-20230114173309-0ff5de5eda5a // indirect
 	github.com/btcsuite/btcd/btcec/v2 v2.2.0 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.0.1 // indirect
 	github.com/go-stack/stack v1.8.1 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
 	github.com/holiman/uint256 v1.2.0 // indirect
+	github.com/huandu/xstrings v1.3.1 // indirect
+	github.com/inet256/go-utp v0.0.0-20230117000540-718d56e713a8 // indirect
 	github.com/klauspost/cpuid/v2 v2.1.1 // indirect
 	github.com/klauspost/reedsolomon v1.11.7 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
