@@ -3,7 +3,7 @@ package fileserver
 import (
 	"net"
 
-	ethlog "github.com/ethereum/go-ethereum/log"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/fjl/discv5-streams/host"
 	"github.com/fjl/discv5-streams/session"
 	"github.com/fjl/discv5-streams/sharedsocket"
@@ -36,12 +36,12 @@ func (r *utpsession) deliver(s *session.Session, packet []byte, src net.Addr) {
 	if err != nil {
 		return
 	}
-	ethlog.Trace("Received uTP packet", "size", len(data))
+	log.Trace("Received uTP packet", "size", len(data))
 	r.conn.PacketIn(data)
 }
 
 func (r *utpsession) packetOut(b []byte, dst net.Addr) (n int, err error) {
-	ethlog.Trace("Sending uTP packet", "size", len(b), "dst", dst)
+	log.Trace("Sending uTP packet", "size", len(b), "dst", dst)
 	data, err := r.session.Encode(r.encBuffer[:0], b)
 	if err != nil {
 		return 0, err
