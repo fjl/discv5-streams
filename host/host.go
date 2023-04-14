@@ -1,6 +1,8 @@
 package host
 
 import (
+	"net"
+
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/p2p/discover"
 	"github.com/ethereum/go-ethereum/p2p/enode"
@@ -33,8 +35,17 @@ func Listen(addr string, cfg Config) (*Host, error) {
 		return nil, err
 	}
 
+	// Configure LocalNode.
 	db, _ := enode.OpenDB("")
 	ln := enode.NewLocalNode(db, cfg.Discovery.PrivateKey)
+	laddr := conn.LocalAddr().(*net.UDPAddr)
+	if laddr.IP.IsUnspecified() {
+		ln.SetFallbackIP(net.IPv4(127, 0, 0, 1))
+	} else {
+		ln.SetFallbackIP(laddr.IP)
+	}
+	ln.SetFallbackUDP(laddr.Port)
+
 	discoverConn := conn.DefaultConn()
 	disc, err := discover.ListenV5(discoverConn, ln, cfg.Discovery)
 	if err != nil {
