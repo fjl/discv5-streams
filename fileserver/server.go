@@ -19,10 +19,10 @@ var (
 	errNotAccepted     = errors.New("request was not accepted")
 )
 
-type ServerFunc func(*FileTransferRequest) error
+type ServerFunc func(*TransferRequest) error
 
 // defaultHandler rejects all file requests.
-func defaultHandler(req *FileTransferRequest) error {
+func defaultHandler(req *TransferRequest) error {
 	return nil
 }
 
@@ -65,7 +65,7 @@ func (s *Server) handleXferInit(node enode.ID, addr *net.UDPAddr, data []byte) [
 	}
 
 	accept := make(chan bool, 1)
-	creq := FileTransferRequest{
+	creq := TransferRequest{
 		Node:       node,
 		Addr:       addr,
 		Filename:   req.Filename,
@@ -81,7 +81,7 @@ func (s *Server) handleXferInit(node enode.ID, addr *net.UDPAddr, data []byte) [
 	return respBytes
 }
 
-func (s *Server) runHandler(creq *FileTransferRequest) {
+func (s *Server) runHandler(creq *TransferRequest) {
 	err := s.cfg.Handler(creq)
 	if err != nil {
 		log.Error("File transfer handler failed", "err", err)
@@ -111,7 +111,7 @@ func (s *Server) sendXferStart(node enode.ID, addr *net.UDPAddr, req *xferStartR
 	return &resp, nil
 }
 
-type FileTransferRequest struct {
+type TransferRequest struct {
 	Node     enode.ID
 	Addr     *net.UDPAddr
 	Filename string
@@ -121,7 +121,7 @@ type FileTransferRequest struct {
 	acceptInit chan bool
 }
 
-func (r *FileTransferRequest) Accept() error {
+func (r *TransferRequest) Accept() error {
 	if r.acceptInit == nil {
 		return errAlreadyAccepted
 	}
@@ -130,7 +130,7 @@ func (r *FileTransferRequest) Accept() error {
 	return nil
 }
 
-func (r *FileTransferRequest) SendFile(size uint64, reader io.Reader) error {
+func (r *TransferRequest) SendFile(size uint64, reader io.Reader) error {
 	if r.acceptInit != nil {
 		return errNotAccepted
 	}
@@ -144,7 +144,7 @@ func (r *FileTransferRequest) SendFile(size uint64, reader io.Reader) error {
 	return err
 }
 
-func (r *FileTransferRequest) startSession(fileSize uint64) (io.Writer, error) {
+func (r *TransferRequest) startSession(fileSize uint64) (io.Writer, error) {
 	initiator, err := r.server.host.SessionStore.Initiator(r.server.cfg.Prefix)
 	if err != nil {
 		return nil, err

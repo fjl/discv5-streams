@@ -89,7 +89,7 @@ func main() {
 }
 
 func fileHandler(dir string) fileserver.ServerFunc {
-	return func(tr *fileserver.FileTransferRequest) error {
+	return func(tr *fileserver.TransferRequest) error {
 		filename := path.Clean(tr.Filename)
 		if filename == "." || filename == "/" {
 			log.Printf("invalid filename: %q", filename)
