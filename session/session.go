@@ -9,36 +9,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/netip"
-	"time"
 
-	"github.com/ethereum/go-ethereum/common/mclock"
-	"github.com/ethereum/go-ethereum/common/prque"
 	"golang.org/x/crypto/hkdf"
 )
-
-const sessionTimeout = 10 * time.Second
-
-// Store keeps active sessions.
-// This type is not safe for concurrent use.
-type Store struct {
-	sessions map[sessionKey]*Session
-	exp      *prque.Prque[mclock.AbsTime, *Session]
-	clock    mclock.Clock
-}
-
-type sessionKey struct {
-	ip netip.Addr
-	id uint64
-}
-
-func NewStore() *Store {
-	return &Store{
-		sessions: make(map[sessionKey]*Session),
-		exp:      prque.New[mclock.AbsTime]((*Session).setIndex),
-		clock:    mclock.System{},
-	}
-}
 
 // Initiator is called by the session initiator to start key agreement.
 // The returned initatorSec must be sent to the recipient.
@@ -84,37 +59,6 @@ func (st *Store) Recipient(srcIP netip.Addr, protocol string, initiatorSec [16]b
 	return s, recipientSec, nil
 }
 
-func (st *Store) store(s *Session) {
-	key := sessionKey{s.ip, s.ingressID}
-	st.sessions[key] = s
-	st.exp.Push(s, st.clock.Now().Add(sessionTimeout))
-}
-
-// Get looks up a session by IP address and ID.
-func (st *Store) Get(srcIP netip.Addr, id uint64) *Session {
-	st.expire(st.clock.Now())
-	key := sessionKey{srcIP, id}
-	s := st.sessions[key]
-	if s != nil {
-		st.exp.Remove(s.heapIndex)
-		st.exp.Push(s, st.clock.Now().Add(sessionTimeout))
-	}
-	return s
-}
-
-// expire removes expired sessions.
-func (st *Store) expire(now mclock.AbsTime) {
-	for !st.exp.Empty() {
-		s, exptime := st.exp.Peek()
-		if exptime > now {
-			break
-		}
-		st.exp.Pop()
-		key := sessionKey{s.ip, s.ingressID}
-		delete(st.sessions, key)
-	}
-}
-
 // Encryption/authentication parameters.
 const (
 	aesKeySize   = 16
@@ -129,9 +73,12 @@ type Session struct {
 	egressID     uint64
 	egressKey    [16]byte
 	nonceCounter uint32
+	handler      SessionPacketHandler
 
 	heapIndex int
 }
+
+type SessionPacketHandler func(*Session, []byte, net.Addr)
 
 func (s *Session) setIndex(i int) {
 	s.heapIndex = i
@@ -197,7 +144,7 @@ func (s *Session) Decode(dest []byte, packet []byte) ([]byte, error) {
 }
 
 // encrypt encrypts msg with the session's egress key. The ciphertext is appended to dest,
-// which must not overlap with plaintext. A fresh nonce is generated and returned.
+// which must not overlap with plaintext.
 func (s *Session) encrypt(dest []byte, plaintext, nonce, authData []byte) []byte {
 	block, err := aes.NewCipher(s.egressKey[:])
 	if err != nil {
