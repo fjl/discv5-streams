@@ -4,6 +4,7 @@ import (
 	"net"
 
 	"github.com/ethereum/go-ethereum/crypto"
+	ethlog "github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p/discover"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/fjl/discv5-streams/session"
@@ -23,6 +24,7 @@ type Host struct {
 
 func Listen(addr string, cfg Config) (*Host, error) {
 	if cfg.Discovery.PrivateKey == nil {
+		ethlog.Info("Generating new node key")
 		key, err := crypto.GenerateKey()
 		if err != nil {
 			return nil, err
@@ -53,11 +55,14 @@ func Listen(addr string, cfg Config) (*Host, error) {
 		return nil, err
 	}
 
+	sessionStore := session.NewStore()
+	conn.AddHandler(sessionStore)
+
 	stack := &Host{
 		Socket:       conn,
 		LocalNode:    ln,
 		Discovery:    disc,
-		SessionStore: session.NewStore(),
+		SessionStore: sessionStore,
 	}
 	return stack, nil
 }
