@@ -16,7 +16,7 @@ import (
 )
 
 // Initiator is called by the session initiator to start key agreement.
-// The returned initatorSec must be sent to the recipient.
+// The initiator secret of the returned state should be sent to the recipient.
 func (st *Store) Initiator(protocol string) (i *InitiatorState, err error) {
 	i = &InitiatorState{st: st, protocol: protocol}
 	_, err = io.ReadFull(crand.Reader, i.initiatorSec[:])
@@ -39,24 +39,24 @@ func (i *InitiatorState) Secret() [16]byte {
 }
 
 // Establish creates the session.
-func (i *InitiatorState) Establish(srcIP netip.Addr, recipientSec [16]byte) *Session {
+func (i *InitiatorState) Establish(srcIP netip.Addr, recipientSecret [16]byte) *Session {
 	s := &Session{ip: srcIP, heapIndex: -1}
-	s.derive(i.protocol, i.initiatorSec, recipientSec, false)
+	s.derive(i.protocol, i.initiatorSec, recipientSecret, false)
 	i.st.store(s)
 	return s
 }
 
 // Recipient is called by the session recipient. It creates a session and returns the
 // recipientSec, which must be sent back to the initiator.
-func (st *Store) Recipient(srcIP netip.Addr, protocol string, initiatorSec [16]byte) (s *Session, recipientSec [16]byte, err error) {
-	_, err = io.ReadFull(crand.Reader, recipientSec[:])
+func (st *Store) Recipient(srcIP netip.Addr, protocol string, initiatorSecret [16]byte) (s *Session, recipientSecret [16]byte, err error) {
+	_, err = io.ReadFull(crand.Reader, recipientSecret[:])
 	if err != nil {
-		return nil, recipientSec, err
+		return nil, recipientSecret, err
 	}
 	s = &Session{ip: srcIP, heapIndex: -1}
-	s.derive(protocol, initiatorSec, recipientSec, true)
+	s.derive(protocol, initiatorSecret, recipientSecret, true)
 	st.store(s)
-	return s, recipientSec, nil
+	return s, recipientSecret, nil
 }
 
 // Encryption/authentication parameters.
