@@ -47,6 +47,7 @@ type clientTransfer struct {
 	acceptStart chan *clientTransfer
 	started     chan *clientTransfer
 	session     *session.Session
+	nodeAddr    *net.UDPAddr
 	err         error
 }
 
@@ -120,8 +121,9 @@ func (c *Client) Request(ctx context.Context, node *enode.Node, file string) (io
 		if t.err != nil {
 			return nil, t.err
 		}
-		// return t.session, nil
-		return nil, nil
+		addr := &net.UDPAddr{IP: node.IP(), Port: node.UDP()}
+		r := newSession(c.host, t.session, addr)
+		return r, nil
 	case <-ctx.Done():
 		clientEvent(c, c.cancel, clientCancelEv{node.ID(), create.id})
 		return nil, ctx.Err()

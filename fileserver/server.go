@@ -6,6 +6,7 @@ import (
 	"io"
 	"net"
 	"net/netip"
+	"time"
 
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p/enode"
@@ -18,14 +19,24 @@ var (
 	errNotAccepted     = errors.New("request was not accepted")
 )
 
+type ServerFunc func(*FileTransferRequest) error
+
+// defaultHandler rejects all file requests.
+func defaultHandler(req *FileTransferRequest) error {
+	return nil
+}
+
 type Config struct {
 	Prefix  string // Protocol name, defaults to "xfer"
-	Handler func(*FileTransferRequest) error
+	Handler ServerFunc
 }
 
 func (cfg Config) withDefaults() Config {
 	if cfg.Prefix == "" {
 		cfg.Prefix = "xfer"
+	}
+	if cfg.Handler == nil {
+		cfg.Handler = defaultHandler
 	}
 	return cfg
 }
@@ -80,9 +91,14 @@ func (s *Server) runHandler(creq *FileTransferRequest) {
 func (s *Server) sendXferStart(node enode.ID, addr *net.UDPAddr, req *xferStartRequest) (*xferStartResponse, error) {
 	xferStart := s.cfg.Prefix + "-start"
 	reqData, _ := rlp.EncodeToBytes(req)
-	respData, err := s.host.Discovery.TalkRequestWithSession(xferStart, node, addr, reqData)
+	respData, err := s.host.Discovery.TalkRequestToID(node, addr, xferStart, reqData)
 	if err != nil {
-		return nil, err
+		// Try one more time.
+		time.Sleep(20 * time.Millisecond)
+		respData, err = s.host.Discovery.TalkRequestToID(node, addr, xferStart, reqData)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	var resp xferStartResponse
@@ -133,6 +149,7 @@ func (r *FileTransferRequest) startSession(fileSize uint64) (io.Writer, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	req := xferStartRequest{
 		ID:              r.xferID,
 		InitiatorSecret: initiator.Secret(),
@@ -145,6 +162,6 @@ func (r *FileTransferRequest) startSession(fileSize uint64) (io.Writer, error) {
 
 	ip, _ := netip.AddrFromSlice(r.Addr.IP)
 	session := initiator.Establish(ip, resp.RecipientSecret)
-	w := newSession(session)
+	w := newSession(r.server.host, session, r.Addr)
 	return w, nil
 }
