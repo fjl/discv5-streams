@@ -269,13 +269,13 @@ func (c *Client) handleXferStart(node enode.ID, addr *net.UDPAddr, reqBytes []by
 		transfer.err = fmt.Errorf("session establishment failed: %v", err)
 		return encodeXferStartResponse(false, [16]byte{})
 	}
+	resp := encodeXferStartResponse(true, rs.Secret())
 
 	// Start the session.
 	rs.SetHandler(transfer.session.deliver)
 	s := rs.Establish()
 	transfer.session.connect(s, addr)
-
-	return encodeXferStartResponse(true, rs.Secret())
+	return resp
 }
 
 func encodeXferStartResponse(ok bool, recipientSecret [16]byte) []byte {
