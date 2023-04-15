@@ -265,10 +265,13 @@ func newDefaultConn(c *Conn) *defaultConn {
 
 // deliver delivers a packet to the application.
 func (dc *defaultConn) deliver(b []byte, addr *net.UDPAddr, quit chan struct{}) bool {
-	p, ok := dc.getPacket(b, addr)
+	p, ok := dc.getPacket()
 	if !ok {
 		return false // connection closed
 	}
+	p.b = append(p.b[:0], b...)
+	p.addr = addr
+
 	select {
 	case dc.in <- p:
 	case <-quit:
@@ -358,7 +361,7 @@ func (dc *defaultConn) SetDeadline(t time.Time) error {
 }
 
 // getPacket retrieves a packet from the buffer pool.
-func (dc *defaultConn) getPacket(b []byte, addr *net.UDPAddr) (*packet, bool) {
+func (dc *defaultConn) getPacket() (*packet, bool) {
 	dc.mutex.Lock()
 	defer dc.mutex.Unlock()
 
@@ -366,12 +369,12 @@ func (dc *defaultConn) getPacket(b []byte, addr *net.UDPAddr) (*packet, bool) {
 		return nil, false
 	}
 	if len(dc.buffers) == 0 {
-		return &packet{b, addr}, true
+		return new(packet), true
 	}
-	p := dc.buffers[len(dc.buffers)-1]
-	dc.buffers = dc.buffers[:len(dc.buffers)-1]
-	p.b = append(p.b[:0], b...)
-	p.addr = addr
+	end := len(dc.buffers) - 1
+	p := dc.buffers[end]
+	dc.buffers[end] = nil
+	dc.buffers = dc.buffers[:end]
 	return p, true
 }
 
