@@ -19,9 +19,10 @@ var (
 	errNotAccepted     = errors.New("request was not accepted")
 )
 
+// Config is the configuration of Server and Client.
 type Config struct {
-	Prefix  string // Protocol name, defaults to "xfer"
-	Handler ServerFunc
+	Prefix  string     // Protocol name, defaults to "xfer".
+	Handler ServerFunc // Called by the server for each request.
 }
 
 func (cfg Config) withDefaults() Config {
@@ -48,6 +49,7 @@ type Server struct {
 	host *host.Host
 }
 
+// Server returns a new file transfer server.
 func NewServer(host *host.Host, cfg Config) *Server {
 	cfg = cfg.withDefaults()
 	srv := &Server{host: host, cfg: &cfg}
@@ -111,6 +113,7 @@ func (s *Server) sendXferStart(node enode.ID, addr *net.UDPAddr, req *xferStartR
 	return &resp, nil
 }
 
+// TransferRequest is a file request from a remote client.
 type TransferRequest struct {
 	Node     enode.ID
 	Addr     *net.UDPAddr
@@ -121,6 +124,8 @@ type TransferRequest struct {
 	acceptInit chan bool
 }
 
+// Accept accepts the file transfer request. This must be called
+// as quickly as possible after receiving the request.
 func (r *TransferRequest) Accept() error {
 	if r.acceptInit == nil {
 		return errAlreadyAccepted
@@ -130,6 +135,7 @@ func (r *TransferRequest) Accept() error {
 	return nil
 }
 
+// SendFile delivers the content in the given reader to the remote client.
 func (r *TransferRequest) SendFile(size uint64, reader io.Reader) error {
 	if r.acceptInit != nil {
 		return errNotAccepted
