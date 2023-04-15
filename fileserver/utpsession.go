@@ -41,12 +41,21 @@ func (r *utpsession) deliver(s *session.Session, packet []byte, src net.Addr) {
 	if err != nil {
 		return
 	}
-	log.Trace("Received uTP packet", "size", len(data))
+	var ptype byte
+	if len(data) > 0 {
+		ptype = data[0] & 0x0F
+	}
+	log.Trace("<< uTP packet", "type", ptype, "size", len(data), "addr", src)
 	r.conn.PacketIn(data)
 }
 
 func (r *utpsession) packetOut(b []byte, dst net.Addr) (n int, err error) {
-	log.Trace("Sending uTP packet", "size", len(b), "dst", dst)
+	var ptype byte
+	if len(b) > 0 {
+		ptype = b[0] & 0x0F
+	}
+
+	log.Trace(">> uTP packet", "type", ptype, "size", len(b), "dst", dst)
 	data, err := r.session.Encode(r.encBuffer[:0], b)
 	if err != nil {
 		return 0, err
