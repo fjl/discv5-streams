@@ -1,6 +1,7 @@
 package session
 
 import (
+	"net"
 	"net/netip"
 	"testing"
 
@@ -20,11 +21,14 @@ func TestSessionRoundtrip(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	rs, rsec, err := st2.Recipient(ip1, "proto", i.Secret())
+	i.SetHandler(dummyHandler)
+	r, err := st2.Recipient("proto", ip1, i.Secret())
 	if err != nil {
 		t.Fatal(err)
 	}
-	is := i.Establish(ip2, rsec)
+	r.SetHandler(dummyHandler)
+	is := i.Establish(ip2, r.Secret())
+	rs := r.Establish()
 	t.Log("isession | in:", is.ingressID, "eg:", is.egressID)
 	t.Log("rsession | in:", rs.ingressID, "eg:", rs.egressID)
 
@@ -55,10 +59,12 @@ func TestSessionStore(t *testing.T) {
 	st := NewStore()
 	st.clock = clock
 
-	s, _, err := st.Recipient(ip1, "proto", [16]byte{})
+	r, err := st.Recipient("proto", ip1, [16]byte{})
 	if err != nil {
 		t.Fatal(err)
 	}
+	r.SetHandler(dummyHandler)
+	s := r.Establish()
 
 	// Check that the session is found in the store after creating it through Recipient.
 	s1 := st.Get(ip1, s.ingressID)
@@ -77,4 +83,8 @@ func TestSessionStore(t *testing.T) {
 	if s3 != nil {
 		t.Fatal("session found after it has expired")
 	}
+}
+
+func dummyHandler(s *Session, packet []byte, src net.Addr) {
+	panic("handler called")
 }

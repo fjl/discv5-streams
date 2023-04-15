@@ -19,7 +19,7 @@ import (
 // The initiator secret of the returned state should be sent to the recipient.
 func (st *Store) Initiator(protocol string) (i *InitiatorState, err error) {
 	i = &InitiatorState{st: st, protocol: protocol}
-	_, err = io.ReadFull(crand.Reader, i.initiatorSec[:])
+	_, err = io.ReadFull(crand.Reader, i.secret[:])
 	if err != nil {
 		return nil, err
 	}
@@ -28,35 +28,80 @@ func (st *Store) Initiator(protocol string) (i *InitiatorState, err error) {
 
 // InitiatorState is the initiator's session establishment state.
 type InitiatorState struct {
-	st           *Store
-	protocol     string
-	initiatorSec [16]byte
+	st       *Store
+	protocol string
+	secret   [16]byte
+	handler  SessionPacketHandler
 }
 
 // Secret returns the initiator secret.
-func (i *InitiatorState) Secret() [16]byte {
-	return i.initiatorSec
+func (is *InitiatorState) Secret() [16]byte {
+	return is.secret
+}
+
+// SetHandler sets the packet handler for the session.
+// This must be called before Establish.
+func (is *InitiatorState) SetHandler(h SessionPacketHandler) {
+	is.handler = h
 }
 
 // Establish creates the session.
-func (i *InitiatorState) Establish(srcIP netip.Addr, recipientSecret [16]byte) *Session {
-	s := &Session{ip: srcIP, heapIndex: -1}
-	s.derive(i.protocol, i.initiatorSec, recipientSecret, false)
-	i.st.store(s)
+func (is *InitiatorState) Establish(srcIP netip.Addr, recipientSecret [16]byte) *Session {
+	if is.handler == nil {
+		panic("no handler set")
+	}
+	s := &Session{ip: srcIP, heapIndex: -1, handler: is.handler}
+	s.derive(is.protocol, &is.secret, &recipientSecret, false)
+	is.st.store(s)
+	for i := range is.secret {
+		is.secret[i] = 0
+	}
 	return s
 }
 
-// Recipient is called by the session recipient. It creates a session and returns the
-// recipientSec, which must be sent back to the initiator.
-func (st *Store) Recipient(srcIP netip.Addr, protocol string, initiatorSecret [16]byte) (s *Session, recipientSecret [16]byte, err error) {
-	_, err = io.ReadFull(crand.Reader, recipientSecret[:])
-	if err != nil {
-		return nil, recipientSecret, err
+// Recipient is called by the session recipient. The recipient secret of the returned
+// state should be sent to the initiator.
+func (st *Store) Recipient(protocol string, srcIP netip.Addr, initiatorSecret [16]byte) (*RecipientState, error) {
+	r := &RecipientState{
+		st: st,
+		s:  &Session{ip: srcIP, heapIndex: -1},
 	}
-	s = &Session{ip: srcIP, heapIndex: -1}
-	s.derive(protocol, initiatorSecret, recipientSecret, true)
-	st.store(s)
-	return s, recipientSecret, nil
+	_, err := io.ReadFull(crand.Reader, r.secret[:])
+	if err != nil {
+		return nil, err
+	}
+	r.s.derive(protocol, &initiatorSecret, &r.secret, true)
+	return r, nil
+}
+
+// RecipientState is the recipient's session establishment state.
+type RecipientState struct {
+	st     *Store
+	s      *Session
+	secret [16]byte
+}
+
+// Secret returns the recipient secret.
+func (r *RecipientState) Secret() [16]byte {
+	return r.secret
+}
+
+// SetHandler sets the packet handler for the session.
+// This must be called before Establish.
+func (r *RecipientState) SetHandler(h SessionPacketHandler) {
+	r.s.handler = h
+}
+
+// Establish creates the session.
+func (r *RecipientState) Establish() *Session {
+	if r.s.handler == nil {
+		panic("no handler set")
+	}
+	for i := range r.secret {
+		r.secret[i] = 0
+	}
+	r.st.store(r.s)
+	return r.s
 }
 
 // Encryption/authentication parameters.
@@ -85,7 +130,7 @@ func (s *Session) setIndex(i int) {
 }
 
 // derive creates the session keys.
-func (s *Session) derive(protocol string, initiatorSec, recipientSec [16]byte, isRecipient bool) {
+func (s *Session) derive(protocol string, initiatorSec, recipientSec *[16]byte, isRecipient bool) {
 	var sec [32]byte
 	defer func() {
 		for i := range sec {

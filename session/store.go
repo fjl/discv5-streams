@@ -16,7 +16,6 @@ import (
 const sessionTimeout = 10 * time.Second
 
 // Store keeps active sessions.
-// This type is not safe for concurrent use.
 type Store struct {
 	mu       sync.Mutex
 	sessions map[sessionKey]*Session
@@ -46,6 +45,30 @@ func (st *Store) store(s *Session) {
 	st.exp.Push(s, st.clock.Now().Add(sessionTimeout))
 }
 
+// Get looks up a session by IP address and ID.
+func (st *Store) Get(srcIP netip.Addr, id uint64) *Session {
+	s, _ := st.get(srcIP, id)
+	return s
+}
+
+// get looks up a session by IP address and ID.
+func (st *Store) get(srcIP netip.Addr, id uint64) (*Session, SessionPacketHandler) {
+	st.mu.Lock()
+	defer st.mu.Unlock()
+
+	st.expire(st.clock.Now())
+	key := sessionKey{srcIP, id}
+	s, ok := st.sessions[key]
+	if !ok {
+		return nil, nil
+	}
+	st.exp.Remove(s.heapIndex)
+	st.exp.Push(s, st.clock.Now().Add(sessionTimeout))
+	return s, s.handler
+}
+
+// HandlePacket decodes an incoming packet and dispatches it to a session handler, if a
+// session exists. It returns true when the packet was handled.
 func (st *Store) HandlePacket(packet []byte, src net.Addr) bool {
 	ipslice := netutil.AddrIP(src)
 	if ipslice == nil {
@@ -67,41 +90,8 @@ func (st *Store) HandlePacket(packet []byte, src net.Addr) bool {
 	if s == nil {
 		return false
 	}
-	if handler == nil {
-		ethlog.Debug("Session has no handler", "ip", srcIP, "id", id)
-		return false
-	}
 	handler(s, packet, src)
 	return true
-}
-
-func (st *Store) SetSessionHandler(s *Session, handler SessionPacketHandler) {
-	st.mu.Lock()
-	defer st.mu.Unlock()
-
-	s.handler = handler
-}
-
-// Get looks up a session by IP address and ID.
-func (st *Store) Get(srcIP netip.Addr, id uint64) *Session {
-	s, _ := st.get(srcIP, id)
-	return s
-}
-
-// Get looks up a session by IP address and ID.
-func (st *Store) get(srcIP netip.Addr, id uint64) (*Session, SessionPacketHandler) {
-	st.mu.Lock()
-	defer st.mu.Unlock()
-
-	st.expire(st.clock.Now())
-	key := sessionKey{srcIP, id}
-	s, ok := st.sessions[key]
-	if !ok {
-		return nil, nil
-	}
-	st.exp.Remove(s.heapIndex)
-	st.exp.Push(s, st.clock.Now().Add(sessionTimeout))
-	return s, s.handler
 }
 
 // expire removes expired sessions.
