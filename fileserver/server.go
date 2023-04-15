@@ -19,13 +19,6 @@ var (
 	errNotAccepted     = errors.New("request was not accepted")
 )
 
-type ServerFunc func(*TransferRequest) error
-
-// defaultHandler rejects all file requests.
-func defaultHandler(req *TransferRequest) error {
-	return nil
-}
-
 type Config struct {
 	Prefix  string // Protocol name, defaults to "xfer"
 	Handler ServerFunc
@@ -39,6 +32,13 @@ func (cfg Config) withDefaults() Config {
 		cfg.Handler = defaultHandler
 	}
 	return cfg
+}
+
+type ServerFunc func(*TransferRequest) error
+
+// defaultHandler rejects all file requests.
+func defaultHandler(req *TransferRequest) error {
+	return nil
 }
 
 // Server is the file transfer server. It handles transfer requests from clients
@@ -139,12 +139,13 @@ func (r *TransferRequest) SendFile(size uint64, reader io.Reader) error {
 	if err != nil {
 		return err
 	}
+	defer w.Close()
 
 	_, err = io.CopyN(w, reader, int64(size))
 	return err
 }
 
-func (r *TransferRequest) startSession(fileSize uint64) (io.Writer, error) {
+func (r *TransferRequest) startSession(fileSize uint64) (io.WriteCloser, error) {
 	initiator, err := r.server.host.SessionStore.Initiator(r.server.cfg.Prefix)
 	if err != nil {
 		return nil, err
@@ -165,5 +166,6 @@ func (r *TransferRequest) startSession(fileSize uint64) (io.Writer, error) {
 	ip, _ := netip.AddrFromSlice(r.Addr.IP)
 	session := initiator.Establish(ip, resp.RecipientSecret)
 	w.connect(session, r.Addr)
+
 	return w, nil
 }
