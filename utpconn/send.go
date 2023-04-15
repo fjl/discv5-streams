@@ -47,6 +47,9 @@ func (s *send) timedOut() {
 }
 
 func (s *send) timeoutResend() {
+	s.conn.mu.Lock()
+	defer s.conn.mu.Unlock()
+
 	if missinggo.MonotonicSince(s.started) >= s.conn.config.writeTimeout {
 		s.timedOut()
 		return
