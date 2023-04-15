@@ -3,9 +3,9 @@ package fileserver
 import (
 	"bytes"
 	"context"
-	"errors"
 	"io"
 	"testing"
+	"testing/fstest"
 	"time"
 
 	"github.com/fjl/discv5-streams/host"
@@ -22,7 +22,7 @@ func TestTransfer(t *testing.T) {
 	host2, _ := host.Listen("127.0.0.1:0", host.Config{})
 	defer host2.Close()
 
-	serverConfig := Config{Handler: testHandler()}
+	serverConfig := Config{Handler: ServeFS(testFS)}
 	NewServer(host1, serverConfig)
 
 	client := NewClient(host2, Config{})
@@ -44,22 +44,12 @@ func TestTransfer(t *testing.T) {
 }
 
 var testContent []byte
+var testFS = fstest.MapFS{}
 
 func init() {
 	testContent = make([]byte, 100000)
 	for i := range testContent {
 		testContent[i] = byte(i)
 	}
-}
-
-func testHandler() ServerFunc {
-	return func(tr *TransferRequest) error {
-		if tr.Filename != "file" {
-			return errors.New("wrong file name")
-		}
-		if err := tr.Accept(); err != nil {
-			return err
-		}
-		return tr.SendFile(uint64(len(testContent)), bytes.NewReader(testContent))
-	}
+	testFS["file"] = &fstest.MapFile{Data: testContent}
 }
