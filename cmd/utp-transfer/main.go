@@ -2,14 +2,11 @@ package main
 
 import (
 	"context"
-	"errors"
 	"flag"
 	"fmt"
 	"io"
 	"log"
 	"os"
-	"path"
-	"path/filepath"
 
 	"github.com/ethereum/go-ethereum/crypto"
 	ethlog "github.com/ethereum/go-ethereum/log"
@@ -57,8 +54,16 @@ func main() {
 	// If server mode is requested, run as server.
 	var config fileserver.Config
 	if *serveFlag != "" {
+		dir := *serveFlag
+		dirinfo, err := os.Stat(dir)
+		if err != nil {
+			log.Fatalf("can't open -serve directory: %v", err)
+		}
+		if !dirinfo.IsDir() {
+			log.Fatalf("-serve path is not a directory")
+		}
 		fmt.Println("server ENR:", host.LocalNode.Node().String())
-		config.Handler = fileHandler(*serveFlag)
+		config.Handler = fileserver.ServeFS(os.DirFS(dir))
 		fileserver.NewServer(host, config)
 		select {}
 	}
@@ -86,39 +91,4 @@ func main() {
 	fmt.Println("copying file to stdout")
 	io.Copy(os.Stdout, r)
 	fmt.Println("done")
-}
-
-func fileHandler(dir string) fileserver.ServerFunc {
-	return func(tr *fileserver.TransferRequest) error {
-		filename := path.Clean(tr.Filename)
-		if filename == "." || filename == "/" {
-			log.Printf("invalid filename: %q", filename)
-			return errors.New("invalid filename")
-		}
-		filename = filepath.Join(dir, filepath.FromSlash(filename))
-
-		f, err := os.Open(filename)
-		if err != nil {
-			log.Printf("error opening file: %v", err)
-			return err
-		}
-		defer f.Close()
-
-		err = tr.Accept()
-		if err != nil {
-			log.Printf("accept error: %v", err)
-			return err
-		}
-
-		stat, err := f.Stat()
-		if err != nil {
-			log.Printf("stat failed: %v", err)
-			return err
-		}
-		err = tr.SendFile(uint64(stat.Size()), f)
-		if err != nil {
-			log.Printf("file send error: %v", err)
-		}
-		return err
-	}
 }
