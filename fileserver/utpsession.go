@@ -4,14 +4,12 @@ import (
 	"net"
 
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/fjl/discv5-streams/host"
 	"github.com/fjl/discv5-streams/session"
-	"github.com/fjl/discv5-streams/sharedsocket"
 	"github.com/fjl/discv5-streams/utpconn"
 )
 
 type utpsession struct {
-	socket  *sharedsocket.Conn
+	socket  writeSocket
 	conn    *utpconn.Conn
 	session *session.Session
 
@@ -19,16 +17,23 @@ type utpsession struct {
 	encBuffer []byte
 }
 
-func newSession(host *host.Host, s *session.Session, remote net.Addr) *utpsession {
+type writeSocket interface {
+	WriteTo(b []byte, addr net.Addr) (n int, err error)
+	LocalAddr() net.Addr
+}
+
+func newSession(socket writeSocket) *utpsession {
 	us := &utpsession{
-		socket:    host.Socket,
-		session:   s,
+		socket:    socket,
 		decBuffer: make([]byte, 2048),
 		encBuffer: make([]byte, 2048),
 	}
-	host.SessionStore.SetSessionHandler(s, us.deliver)
-	us.conn = utpconn.NewConn(us.socket.LocalAddr(), remote, us.packetOut)
 	return us
+}
+
+func (r *utpsession) connect(s *session.Session, remote net.Addr) {
+	r.session = s
+	r.conn = utpconn.NewConn(r.socket.LocalAddr(), remote, r.packetOut)
 }
 
 func (r *utpsession) deliver(s *session.Session, packet []byte, src net.Addr) {

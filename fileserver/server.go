@@ -160,8 +160,10 @@ func (r *TransferRequest) startSession(fileSize uint64) (io.Writer, error) {
 		return nil, err
 	}
 
+	w := newSession(r.server.host.Socket)
+	initiator.SetHandler(w.deliver)
 	ip, _ := netip.AddrFromSlice(r.Addr.IP)
 	session := initiator.Establish(ip, resp.RecipientSecret)
-	w := newSession(r.server.host, session, r.Addr)
+	w.connect(session, r.Addr)
 	return w, nil
 }

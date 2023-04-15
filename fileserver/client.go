@@ -15,7 +15,6 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/fjl/discv5-streams/host"
-	"github.com/fjl/discv5-streams/session"
 )
 
 const (
@@ -46,8 +45,7 @@ type clientTransfer struct {
 	createTime  time.Time
 	acceptStart chan *clientTransfer
 	started     chan *clientTransfer
-	session     *session.Session
-	nodeAddr    *net.UDPAddr
+	session     *utpsession
 	err         error
 }
 
@@ -62,6 +60,7 @@ type (
 		node    enode.ID
 		id      uint16
 		started chan *clientTransfer
+		session *utpsession
 	}
 
 	clientCancelEv struct {
@@ -106,6 +105,7 @@ func (c *Client) Request(ctx context.Context, node *enode.Node, file string) (io
 		id:      c.generateID(),
 		node:    node.ID(),
 		started: make(chan *clientTransfer, 1),
+		session: newSession(c.host.Socket),
 	}
 	if !clientEvent(c, c.create, create) {
 		return nil, errClientClosed
@@ -121,9 +121,7 @@ func (c *Client) Request(ctx context.Context, node *enode.Node, file string) (io
 		if t.err != nil {
 			return nil, t.err
 		}
-		addr := &net.UDPAddr{IP: node.IP(), Port: node.UDP()}
-		r := newSession(c.host, t.session, addr)
-		return r, nil
+		return create.session, nil
 	case <-ctx.Done():
 		clientEvent(c, c.cancel, clientCancelEv{node.ID(), create.id})
 		return nil, ctx.Err()
@@ -162,6 +160,7 @@ func (c *Client) loop() {
 			key := transferKey{create.node, create.id}
 			transfers[key] = &clientTransfer{
 				started: create.started,
+				session: create.session,
 			}
 
 		case cancel := <-c.cancel:
@@ -265,13 +264,18 @@ func (c *Client) handleXferStart(node enode.ID, addr *net.UDPAddr, reqBytes []by
 	defer func() { transfer.started <- transfer }()
 
 	ip, _ := netip.AddrFromSlice(addr.IP)
-	session, recipientSecret, err := c.host.SessionStore.Recipient(ip, c.cfg.Prefix, req.InitiatorSecret)
+	rs, err := c.host.SessionStore.Recipient(c.cfg.Prefix, ip, req.InitiatorSecret)
 	if err != nil {
 		transfer.err = fmt.Errorf("session establishment failed: %v", err)
 		return encodeXferStartResponse(false, [16]byte{})
 	}
-	transfer.session = session
-	return encodeXferStartResponse(true, recipientSecret)
+
+	// Start the session.
+	rs.SetHandler(transfer.session.deliver)
+	s := rs.Establish()
+	transfer.session.connect(s, addr)
+
+	return encodeXferStartResponse(true, rs.Secret())
 }
 
 func encodeXferStartResponse(ok bool, recipientSecret [16]byte) []byte {
