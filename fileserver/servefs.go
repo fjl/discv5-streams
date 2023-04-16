@@ -19,20 +19,24 @@ func serveFile(fsys fs.FS, tr *TransferRequest) error {
 		return fs.ErrInvalid
 	}
 
+	if err := tr.Accept(); err != nil {
+		return err
+	}
+
 	f, err := fsys.Open(filename)
 	if err != nil {
 		return err
 	}
 	defer f.Close()
 
-	if err = tr.Accept(); err != nil {
-		return err
-	}
-
 	stat, err := f.Stat()
 	if err != nil {
 		return err
 	}
+	if stat.IsDir() {
+		return fmt.Errorf("can't send directory")
+	}
+
 	err = tr.SendFile(uint64(stat.Size()), f)
 	if err != nil {
 		err = fmt.Errorf("send error: %w", err)
