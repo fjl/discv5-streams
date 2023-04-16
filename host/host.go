@@ -32,6 +32,10 @@ func Listen(addr string, cfg Config) (*Host, error) {
 		cfg.Discovery.PrivateKey = key
 	}
 
+	if cfg.Discovery.Bootnodes == nil {
+		cfg.Discovery.Bootnodes = parseDefaultBootnodes()
+	}
+
 	conn, err := sharedsocket.Listen("udp4", addr)
 	if err != nil {
 		return nil, err
