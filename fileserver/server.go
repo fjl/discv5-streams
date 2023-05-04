@@ -88,6 +88,7 @@ func (s *Server) runHandler(creq *TransferRequest) {
 	if err != nil {
 		log.Error("File transfer handler failed", "err", err)
 	}
+	creq.reject()
 }
 
 func (s *Server) sendXferStart(node enode.ID, addr *net.UDPAddr, req *xferStartRequest) (*xferStartResponse, error) {
@@ -133,6 +134,14 @@ func (r *TransferRequest) Accept() error {
 	r.acceptInit <- true
 	r.acceptInit = nil
 	return nil
+}
+
+func (r *TransferRequest) reject() {
+	if r.acceptInit == nil {
+		return
+	}
+	r.acceptInit <- false
+	r.acceptInit = nil
 }
 
 // SendFile delivers the content in the given reader to the remote client.
