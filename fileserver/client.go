@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"math"
 	"math/rand"
 	"net"
@@ -93,6 +94,7 @@ func NewClient(host *host.Host, cfg Config) *Client {
 		cfg:    &cfg,
 		quit:   make(chan struct{}),
 		create: make(chan clientCreateEv),
+		cancel: make(chan clientCancelEv),
 		init:   make(chan clientInitEv),
 		start:  make(chan clientStartEv),
 	}
@@ -163,6 +165,7 @@ func (c *Client) loop() {
 	for {
 		select {
 		case create := <-c.create:
+			log.Printf("client: transfer created: %x:%d", create.node[:8], create.id)
 			key := transferKey{create.node, create.id}
 			transfers[key] = &clientTransfer{
 				started: create.started,
@@ -170,6 +173,7 @@ func (c *Client) loop() {
 			}
 
 		case cancel := <-c.cancel:
+			log.Printf("client: transfer canceled: %x:%d", cancel.node[:8], cancel.id)
 			key := transferKey{cancel.node, cancel.id}
 			t := transfers[key]
 			if t != nil {
