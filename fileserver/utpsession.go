@@ -9,9 +9,10 @@ import (
 )
 
 type utpsession struct {
-	socket  writeSocket
-	conn    *utpconn.Conn
-	session *session.Session
+	socket       writeSocket
+	conn         *utpconn.Conn
+	session      *session.Session
+	transferSize int64
 
 	decBuffer []byte
 	encBuffer []byte
@@ -64,6 +65,10 @@ func (r *utpsession) packetOut(b []byte, dst net.Addr) (n int, err error) {
 		return 0, err
 	}
 	return len(b), nil
+}
+
+func (r *utpsession) Size() int64 {
+	return r.transferSize
 }
 
 func (r *utpsession) Read(b []byte) (n int, err error) {

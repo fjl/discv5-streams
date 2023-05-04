@@ -17,10 +17,8 @@ import (
 	"github.com/fjl/discv5-streams/host"
 )
 
-const (
-	// This is how long the client will wait for an xfer-start request from the server.
-	transferStartTimeout = 10 * time.Second
-)
+// This is how long the client will wait for an xfer-start request from the server.
+const transferStartTimeout = 10 * time.Second
 
 var (
 	errClientClosed             = errors.New("client closed")
@@ -41,11 +39,18 @@ type Client struct {
 	start  chan clientStartEv
 }
 
+type ClientStream interface {
+	io.Reader
+	io.Closer
+	Size() int64
+}
+
 type clientTransfer struct {
 	createTime  time.Time
 	acceptStart chan *clientTransfer
 	started     chan *clientTransfer
 	session     *utpsession
+	fileSize    int64
 	err         error
 }
 
@@ -100,7 +105,7 @@ func NewClient(host *host.Host, cfg Config) *Client {
 }
 
 // Request fetches a file from the given node.
-func (c *Client) Request(ctx context.Context, node *enode.Node, file string) (io.ReadCloser, error) {
+func (c *Client) Request(ctx context.Context, node *enode.Node, file string) (ClientStream, error) {
 	create := clientCreateEv{
 		id:      c.generateID(),
 		node:    node.ID(),
@@ -121,6 +126,7 @@ func (c *Client) Request(ctx context.Context, node *enode.Node, file string) (io
 		if t.err != nil {
 			return nil, t.err
 		}
+		create.session.transferSize = t.fileSize
 		return create.session, nil
 	case <-ctx.Done():
 		clientEvent(c, c.cancel, clientCancelEv{node.ID(), create.id})
@@ -243,6 +249,9 @@ func (c *Client) handleXferStart(node enode.ID, addr *net.UDPAddr, reqBytes []by
 	if err := rlp.DecodeBytes(reqBytes, &req); err != nil {
 		return nil
 	}
+	if req.FileSize > math.MaxInt64 {
+		return nil // overflow, ignore request
+	}
 
 	accept := make(chan *clientTransfer, 1)
 	c.start <- clientStartEv{node, req, accept}
@@ -259,6 +268,8 @@ func (c *Client) handleXferStart(node enode.ID, addr *net.UDPAddr, reqBytes []by
 		// Canceled or timed out.
 		return encodeXferStartResponse(false, [16]byte{})
 	}
+
+	transfer.fileSize = int64(req.FileSize)
 
 	// Relay accept signal to the waiting caller.
 	defer func() { transfer.started <- transfer }()
