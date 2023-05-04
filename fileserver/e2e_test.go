@@ -3,6 +3,7 @@ package fileserver
 import (
 	"bytes"
 	"context"
+	"errors"
 	"io"
 	"testing"
 	"testing/fstest"
@@ -13,7 +14,7 @@ import (
 )
 
 // func init() {
-// 	log.Root().SetHandler(log.LvlFilterHandler(log.LvlTrace, log.StreamHandler(os.Stderr, log.TerminalFormat(false))))
+//	log.Root().SetHandler(log.LvlFilterHandler(log.LvlTrace, log.StreamHandler(os.Stderr, log.TerminalFormat(false))))
 // }
 
 var testContent []byte
@@ -98,4 +99,35 @@ func TestClientTransferSize(t *testing.T) {
 		t.Fatal("wrong size")
 	}
 	r.Close()
+}
+
+func TestClientRejectHandling(t *testing.T) {
+	test := newTestSetup(t)
+	defer test.close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	// The server should reject the transfer below, because it has an invalid file name.
+	_, err := test.client.Request(ctx, test.serverNode(), "///")
+	if err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestClientTimeoutHandling(t *testing.T) {
+	test := newTestSetup(t)
+	defer test.close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+	defer cancel()
+
+	// The server will just time out this request, because the file does not exist.
+	_, err := test.client.Request(ctx, test.serverNode(), "wrong-file")
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatal("expected timeout error")
+	}
 }
