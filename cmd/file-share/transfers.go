@@ -183,7 +183,7 @@ waitForNetwork:
 func (t *transfersController) mainLoop(state transfersState, client *fileserver.Client) {
 	var (
 		saveRequested = state.wasReset
-		idCounter     = state.maxID()
+		idCounter     = state.maxID() + 1
 		saveDone      chan struct{}
 	)
 	for {
