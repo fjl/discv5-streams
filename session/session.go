@@ -114,11 +114,11 @@ const (
 type Session struct {
 	ip           netip.Addr
 	ingressID    uint64
-	ingressKey   [16]byte
 	egressID     uint64
-	egressKey    [16]byte
-	nonceCounter uint32
+	ingress      cipher.AEAD
+	egress       cipher.AEAD
 	handler      SessionPacketHandler
+	nonceCounter uint32
 
 	heapIndex int
 }
@@ -145,13 +145,15 @@ func (s *Session) derive(protocol string, initiatorSec, recipientSec *[16]byte, 
 	var kdata [48]byte
 	kdf.Read(kdata[:])
 
-	copy(s.ingressKey[:], kdata[0:16])
-	copy(s.egressKey[:], kdata[16:32])
+	ingressKey := kdata[0:16]
+	egressKey := kdata[16:32]
 	s.ingressID = binary.BigEndian.Uint64(kdata[32:40])
 	s.egressID = binary.BigEndian.Uint64(kdata[40:48])
+	s.ingress, _ = newGCM(ingressKey)
+	s.egress, _ = newGCM(egressKey)
 
 	if isRecipient {
-		s.ingressKey, s.egressKey = s.egressKey, s.ingressKey
+		s.ingress, s.egress = s.egress, s.ingress
 		s.ingressID, s.egressID = s.egressID, s.ingressID
 	}
 }
@@ -191,30 +193,26 @@ func (s *Session) Decode(dest []byte, packet []byte) ([]byte, error) {
 // encrypt encrypts msg with the session's egress key. The ciphertext is appended to dest,
 // which must not overlap with plaintext.
 func (s *Session) encrypt(dest []byte, plaintext, nonce, authData []byte) []byte {
-	block, err := aes.NewCipher(s.egressKey[:])
-	if err != nil {
-		panic(fmt.Errorf("can't create block cipher: %v", err))
-	}
-	aesgcm, err := cipher.NewGCMWithNonceSize(block, gcmNonceSize)
-	if err != nil {
-		panic(fmt.Errorf("can't create GCM: %v", err))
-	}
-	return aesgcm.Seal(dest, nonce, plaintext, authData)
+	return s.egress.Seal(dest, nonce, plaintext, authData)
 }
 
 // decrypt decrypts/authenticates a ciphertext with the session's ingress key and the
 // given nonce. The plaintext is appended to dest, which must not overlap with ciphertext.
 func (s *Session) decrypt(dest, ciphertext, nonce, authData []byte) ([]byte, error) {
-	block, err := aes.NewCipher(s.ingressKey[:])
-	if err != nil {
-		return nil, fmt.Errorf("can't create block cipher: %v", err)
-	}
 	if len(nonce) != gcmNonceSize {
 		return nil, fmt.Errorf("invalid GCM nonce size: %d", len(nonce))
+	}
+	return s.ingress.Open(dest, nonce, ciphertext, authData)
+}
+
+func newGCM(key []byte) (cipher.AEAD, error) {
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, fmt.Errorf("can't create block cipher: %v", err)
 	}
 	aesgcm, err := cipher.NewGCMWithNonceSize(block, gcmNonceSize)
 	if err != nil {
 		return nil, fmt.Errorf("can't create GCM: %v", err)
 	}
-	return aesgcm.Open(dest, nonce, ciphertext, authData)
+	return aesgcm, nil
 }
