@@ -3,7 +3,6 @@ package fileserver
 import (
 	"net"
 
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/fjl/discv5-streams/session"
 	"github.com/fjl/discv5-streams/utpconn"
 )
@@ -42,21 +41,20 @@ func (r *utpsession) deliver(s *session.Session, packet []byte, src net.Addr) {
 	if err != nil {
 		return
 	}
-	var ptype byte
-	if len(data) > 0 {
-		ptype = data[0] & 0x0F
-	}
-	log.Trace("<< uTP packet", "type", ptype, "size", len(data), "addr", src)
+	// var ptype byte
+	// if len(data) > 0 {
+	// 	ptype = data[0] & 0x0F
+	// }
+	// log.Trace("<< uTP packet", "type", ptype, "size", len(data), "addr", src)
 	r.conn.PacketIn(data)
 }
 
 func (r *utpsession) packetOut(b []byte, dst net.Addr) (n int, err error) {
-	var ptype byte
-	if len(b) > 0 {
-		ptype = b[0] & 0x0F
-	}
-
-	log.Trace(">> uTP packet", "type", ptype, "size", len(b), "dst", dst)
+	// var ptype byte
+	// if len(b) > 0 {
+	// 	ptype = b[0] & 0x0F
+	// }
+	// log.Trace(">> uTP packet", "type", ptype, "size", len(b), "dst", dst)
 	data, err := r.session.Encode(r.encBuffer[:0], b)
 	if err != nil {
 		return 0, err
