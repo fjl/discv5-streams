@@ -52,7 +52,10 @@ func (net *networkController) State() *networkState {
 
 // Restart restarts the network.
 func (net *networkController) Restart() {
-	net.restartCh <- struct{}{}
+	select {
+	case net.restartCh <- struct{}{}:
+	case <-net.closeCh:
+	}
 }
 
 // SetClientChan sets the channel on which client instances are published.
