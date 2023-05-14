@@ -16,8 +16,7 @@ import (
 
 var _ net.Conn = &Conn{}
 
-// Conn is a uTP stream and implements net.Conn. It owned by a Socket, which
-// handles dispatching packets to and from Conns.
+// Conn is a uTP stream and implements net.Conn.
 type Conn struct {
 	recv_id, send_id uint16
 	seq_nr, ack_nr   uint16
@@ -240,7 +239,7 @@ func (c *Conn) write(_type st, connID uint16, payload []byte, seqNr uint16) (n i
 	}
 	send := &send{
 		payloadSize: uint32(len(payload)),
-		started:     missinggo.MonotonicNow(),
+		started:     time.Now(),
 		_type:       _type,
 		connID:      connID,
 		payload:     payload,

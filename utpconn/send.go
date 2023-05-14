@@ -11,7 +11,7 @@ import (
 type send struct {
 	acked       missinggo.Event
 	payloadSize uint32
-	started     missinggo.MonotonicTime
+	started     time.Time
 	_type       st
 	connID      uint16
 	payload     []byte
@@ -28,7 +28,7 @@ type send struct {
 func (s *send) Ack() (latency time.Duration, first bool) {
 	first = !s.acked.IsSet()
 	if first {
-		latency = missinggo.MonotonicSince(s.started)
+		latency = time.Since(s.started)
 	}
 	if s.payload != nil {
 		sendBufferPool.Put(s.payload[:0:minMTU])
@@ -50,7 +50,7 @@ func (s *send) timeoutResend() {
 	s.conn.mu.Lock()
 	defer s.conn.mu.Unlock()
 
-	if missinggo.MonotonicSince(s.started) >= s.conn.config.writeTimeout {
+	if time.Since(s.started) >= s.conn.config.writeTimeout {
 		s.timedOut()
 		return
 	}
