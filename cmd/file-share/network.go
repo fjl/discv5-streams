@@ -123,6 +123,7 @@ restart:
 			net.update(host)
 
 		case <-net.restartCh:
+			host.Close()
 			goto restart
 
 		case <-net.closeCh:
