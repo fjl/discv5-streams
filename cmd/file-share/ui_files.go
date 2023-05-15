@@ -112,12 +112,16 @@ func (ui *filesUI) Layout(gtx C) D {
 func (ui *filesUI) drawFileList(gtx C) D {
 	ui.list.Axis = layout.Vertical
 	ls := material.List(ui.theme, &ui.list)
-	return ls.Layout(gtx, len(ui.state.list), func(gtx C, i int) D {
-		file := ui.state.list[i]
+	return ls.Layout(gtx, len(ui.state.list), func(gtx C, index int) D {
+		file := ui.state.list[index]
+		inset := layout.Inset{Top: 8, Bottom: 2, Left: 16, Right: 4}
+		if index == 0 {
+			inset.Top = 16
+		}
+
 		flex := layout.Flex{Axis: layout.Vertical}
 		return flex.Layout(gtx,
 			layout.Rigid(func(gtx C) D {
-				inset := layout.Inset{Top: 8, Bottom: 2, Left: 16, Right: 4}
 				return inset.Layout(gtx, func(gtx C) D {
 					return ui.drawFileRow(gtx, file)
 				})

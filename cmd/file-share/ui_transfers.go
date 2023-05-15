@@ -85,11 +85,14 @@ func (ui *transfersUI) drawTransferList(gtx C, transfers []*transfer) D {
 	list := material.List(ui.theme, &ui.list)
 	return list.Layout(gtx, len(transfers), func(gtx C, index int) D {
 		tx := transfers[index]
+		inset := layout.Inset{Top: 8, Bottom: 2, Left: 16, Right: 4}
+		if index == 0 {
+			inset.Top = 16
+		}
 
 		flex := layout.Flex{Axis: layout.Vertical}
 		return flex.Layout(gtx,
 			layout.Rigid(func(gtx C) D {
-				inset := layout.Inset{Top: 10, Bottom: 2, Left: 16, Right: 4}
 				return inset.Layout(gtx, func(gtx C) D {
 					return ui.drawTransferRow(gtx, tx)
 				})
