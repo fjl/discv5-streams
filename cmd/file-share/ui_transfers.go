@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"image"
+	"image/color"
 	"time"
 
 	"gioui.org/io/pointer"
@@ -17,24 +18,29 @@ import (
 	"golang.org/x/exp/shiny/materialdesign/icons"
 )
 
+var errorColor = color.NRGBA{R: 127, G: 0, B: 0, A: 127}
+
 type transfersUI struct {
 	theme *material.Theme
 	tc    *transfersController
 
 	error    *errorMessageUI
+	sheet    *downloadSheet
+	list     widget.List
 	dlButton widget.Clickable
 	dlIcon   *widget.Icon
-	list     widget.List
-	sheet    *downloadSheet
+	errIcon  *widget.Icon
 }
 
 func newTransfersUI(theme *material.Theme, tc *transfersController) *transfersUI {
 	dlIcon, _ := widget.NewIcon(icons.FileFileDownload)
+	errIcon, _ := widget.NewIcon(icons.AlertError)
 	ui := &transfersUI{
-		tc:     tc,
-		theme:  theme,
-		dlIcon: dlIcon,
-		error:  newErrorMessageUI(theme, tc.RetryLoad, tc.ResetState),
+		tc:      tc,
+		theme:   theme,
+		error:   newErrorMessageUI(theme, tc.RetryLoad, tc.ResetState),
+		dlIcon:  dlIcon,
+		errIcon: errIcon,
 	}
 	ui.list.Axis = layout.Vertical
 	return ui
@@ -123,9 +129,6 @@ func (ui *transfersUI) drawTransferRow(gtx C, tx *transfer) D {
 				layout.Flexed(1.0, func(gtx C) D {
 					return ui.drawTransferName(gtx, tx)
 				}),
-				// layout.Rigid(func(gtx C) D {
-				//	return ui.drawTransferButtons(gtx, tx)
-				// }),
 			)
 		}),
 		layout.Rigid(layout.Spacer{Height: unit.Dp(4)}.Layout),
@@ -158,16 +161,35 @@ func (ui *transfersUI) drawTransferProgress(gtx C, tx *transfer) D {
 func (ui *transfersUI) drawTransferStatus(gtx C, tx *transfer) D {
 	var text string
 	switch tx.Status {
+	case transferStatusConnecting, transferStatusResolving:
+		text = fmt.Sprintf("Connecting...")
 	case transferStatusDownloading:
 		text = fmt.Sprintf("%s / %s (%s/s)", bytesString(tx.ReadBytes), bytesString(tx.Size), bytesString(tx.ReadSpeed))
 	case transferStatusError:
-		text = fmt.Sprintf("Error: %s", tx.Error)
+		text = fmt.Sprintf("%s (%s)", tx.Error, tx.Created.Format(time.DateTime))
 	case transferStatusDone:
 		text = fmt.Sprintf("%s (%s)", bytesString(tx.Size), tx.Created.Format(time.DateTime))
 	default:
 		text = bytesString(tx.Size)
 	}
-	return material.Caption(ui.theme, text).Layout(gtx)
+	label := material.Caption(ui.theme, text)
+	label.MaxLines = 1
+
+	// If there was no error, status is just the label.
+	if tx.Status != transferStatusError {
+		return label.Layout(gtx)
+	}
+
+	// For errors, add an icon.
+	flex := layout.Flex{Axis: layout.Horizontal, Alignment: layout.Middle}
+	return flex.Layout(gtx,
+		layout.Rigid(func(gtx C) D {
+			gtx.Constraints = layout.Exact(image.Pt(gtx.Dp(16), gtx.Dp(16)))
+			return ui.errIcon.Layout(gtx, ui.theme.Fg)
+		}),
+		layout.Rigid(layout.Spacer{Width: 4}.Layout),
+		layout.Flexed(1, label.Layout),
+	)
 }
 
 func (ui *transfersUI) drawDownloadButton(gtx C) D {
