@@ -44,6 +44,15 @@ func (ui *transfersUI) AppBarTitle() string {
 	return "Transfers"
 }
 
+func (ui *transfersUI) AppBarActions() []*appMenuItem {
+	return []*appMenuItem{
+		{
+			Name:   "Clear completed",
+			Action: ui.tc.ClearCompleted,
+		},
+	}
+}
+
 func (ui *transfersUI) Deactivate() {
 	if ui.sheet != nil {
 		ui.sheet.close()

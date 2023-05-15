@@ -72,6 +72,15 @@ func (ui *networkUI) AppBarTitle() string {
 	return "Network"
 }
 
+func (ui *networkUI) AppBarActions() []*appMenuItem {
+	return []*appMenuItem{
+		{
+			Name:   "Restart networking",
+			Action: ui.net.Restart,
+		},
+	}
+}
+
 func (ui *networkUI) Changed() <-chan struct{} {
 	return ui.net.Changed()
 }

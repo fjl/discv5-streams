@@ -2,6 +2,7 @@ package main
 
 import (
 	"image/color"
+	"log"
 	"path/filepath"
 
 	"gioui.org/layout"
@@ -67,9 +68,18 @@ type mainUI struct {
 
 type appView interface {
 	AppBarTitle() string
-	Layout(C) D
-	Deactivate()
+	AppBarActions() []*appMenuItem
+
+	Layout(C) D  // draws the view
+	Deactivate() // called when switching to another view
+
+	// This channel should be notified when state has changed.
 	Changed() <-chan struct{}
+}
+
+type appMenuItem struct {
+	Name   string
+	Action func()
 }
 
 func newMainUI(th *material.Theme, exp *explorer.Explorer, state *appState) *mainUI {
@@ -88,8 +98,6 @@ func newMainUI(th *material.Theme, exp *explorer.Explorer, state *appState) *mai
 
 	ui.modal = component.NewModal()
 	ui.appbar = component.NewAppBar(ui.modal)
-	ui.appbar.SetActions(ui.actions())
-
 	ui.changeView(ui.filespace)
 	return ui
 }
@@ -98,14 +106,15 @@ func (ui *mainUI) changeView(view appView) {
 	if ui.current != nil {
 		ui.current.Deactivate()
 	}
-	ui.appbar.Title = view.AppBarTitle()
 	ui.current = view
+	ui.appbar.Title = view.AppBarTitle()
+	ui.appbar.SetActions(ui.actions())
 }
 
 func (ui *mainUI) actions() ([]component.AppBarAction, []component.OverflowAction) {
-	filespaceOverflow := component.OverflowAction{Name: "Server", Tag: ui.filespace}
-	networkOverflow := component.OverflowAction{Name: "Network", Tag: ui.network}
-	transfersOverflow := component.OverflowAction{Name: "Transfers", Tag: ui.network}
+	filespaceOverflow := component.OverflowAction{Name: "Files", Tag: viewChange{ui.filespace}}
+	networkOverflow := component.OverflowAction{Name: "Network", Tag: viewChange{ui.network}}
+	transfersOverflow := component.OverflowAction{Name: "Transfers", Tag: viewChange{ui.transfers}}
 	actions := []component.AppBarAction{
 		{
 			OverflowAction: networkOverflow,
@@ -129,7 +138,19 @@ func (ui *mainUI) actions() ([]component.AppBarAction, []component.OverflowActio
 			},
 		},
 	}
-	return actions, nil
+
+	// Create the overflow menu.
+	menu := ui.current.AppBarActions()
+	overflow := make([]component.OverflowAction, len(menu))
+	for i := range menu {
+		overflow[i] = component.OverflowAction{Name: menu[i].Name, Tag: menu[i]}
+	}
+
+	return actions, overflow
+}
+
+type viewChange struct {
+	view appView
 }
 
 func (ui *mainUI) Layout(gtx C) D {
@@ -142,6 +163,18 @@ func (ui *mainUI) Layout(gtx C) D {
 	}
 	if ui.transfersClick.Clicked() {
 		ui.changeView(ui.transfers)
+	}
+	for _, ev := range ui.appbar.Events(gtx) {
+		switch ev := ev.(type) {
+		case component.AppBarOverflowActionClicked:
+			switch tag := ev.Tag.(type) {
+			case viewChange:
+				ui.changeView(tag.view)
+			case *appMenuItem:
+				log.Printf("main: app menu action %q", tag.Name)
+				tag.Action()
+			}
+		}
 	}
 
 	// Render the current view.

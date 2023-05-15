@@ -80,6 +80,10 @@ func (ui *filesUI) AppBarTitle() string {
 	return "Files"
 }
 
+func (ui *filesUI) AppBarActions() []*appMenuItem {
+	return nil
+}
+
 func (ui *filesUI) Changed() <-chan struct{} {
 	return ui.fs.Changed()
 }
