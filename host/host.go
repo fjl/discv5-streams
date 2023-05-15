@@ -1,6 +1,7 @@
 package host
 
 import (
+	"fmt"
 	"net"
 
 	"github.com/ethereum/go-ethereum/crypto"
@@ -29,6 +30,7 @@ var ConfigForTesting = Config{
 type Host struct {
 	Socket       *sharedsocket.Conn
 	LocalNode    *enode.LocalNode
+	NodeDB       *enode.DB
 	Discovery    *discover.UDPv5
 	SessionStore *session.Store
 }
@@ -59,7 +61,10 @@ func Listen(cfg Config) (*Host, error) {
 	}
 
 	// Configure LocalNode.
-	db, _ := enode.OpenDB(cfg.NodeDB)
+	db, err := enode.OpenDB(cfg.NodeDB)
+	if err != nil {
+		return nil, fmt.Errorf("can't open nodes database: %w", err)
+	}
 	ln := enode.NewLocalNode(db, cfg.Discovery.PrivateKey)
 	laddr := conn.LocalAddr().(*net.UDPAddr)
 	if laddr.IP.IsUnspecified() {
@@ -84,6 +89,7 @@ func Listen(cfg Config) (*Host, error) {
 	stack := &Host{
 		Socket:       conn,
 		LocalNode:    ln,
+		NodeDB:       db,
 		Discovery:    disc,
 		SessionStore: sessionStore,
 	}
@@ -93,5 +99,7 @@ func Listen(cfg Config) (*Host, error) {
 // Close terminates the stack.
 func (s *Host) Close() error {
 	s.Discovery.Close()
-	return s.Socket.Close()
+	err := s.Socket.Close()
+	s.NodeDB.Close()
+	return err
 }
