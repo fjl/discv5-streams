@@ -81,7 +81,12 @@ func (ui *filesUI) AppBarTitle() string {
 }
 
 func (ui *filesUI) AppBarActions() []*appMenuItem {
-	return nil
+	return []*appMenuItem{
+		{
+			Name:   "Remove all files",
+			Action: ui.fs.ResetDatabase,
+		},
+	}
 }
 
 func (ui *filesUI) Changed() <-chan struct{} {
