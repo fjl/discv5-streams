@@ -88,7 +88,7 @@ func (ui *filesUI) Deactivate() {
 }
 
 func (ui *filesUI) Layout(gtx C) D {
-	state := ui.fs.Files()
+	state := ui.fs.State()
 
 	switch {
 	case state.loading:

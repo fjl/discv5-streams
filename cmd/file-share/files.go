@@ -87,14 +87,20 @@ func newFilesController(stateFile string) *filesController {
 	return fs
 }
 
-// Files returns the current file list.
-func (fc *filesController) Files() *filesState {
+// State returns the current file list.
+func (fc *filesController) State() *filesState {
 	return fc.files.Load()
+}
+
+// Changed returns a channel that fires whenever the file list
+// has changed. This is used to trigger UI updates.
+func (fc *filesController) Changed() <-chan struct{} {
+	return fc.changeEventCh
 }
 
 // ServeFile serves a file to a peer.
 func (fc *filesController) ServeFile(tr *fileserver.TransferRequest) error {
-	state := fc.Files()
+	state := fc.State()
 	if state.loadError != nil {
 		return state.loadError
 	}
@@ -128,12 +134,6 @@ func (fc *filesController) serveFile(tr *fileserver.TransferRequest, f *fileRef)
 		return err
 	}
 	return tr.SendFile(uint64(info.Size()), r)
-}
-
-// Changed returns a channel that fires whenever the file list
-// has changed. This is used to trigger UI updates.
-func (fc *filesController) Changed() <-chan struct{} {
-	return fc.changeEventCh
 }
 
 // AddFile adds a file to the file space.
