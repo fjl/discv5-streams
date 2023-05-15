@@ -318,10 +318,11 @@ func (t *transfersController) saveList(list []*transfer) error {
 
 func (t *transfersController) startTransfer(id uint64, client *fileserver.Client, ref fileserver.TransferRef) transfer {
 	tx := transfer{
-		ID:     id,
-		ref:    ref,
-		Name:   ref.File,
-		Status: transferStatusConnecting,
+		ID:      id,
+		ref:     ref,
+		Name:    ref.File,
+		Created: time.Now(),
+		Status:  transferStatusConnecting,
 	}
 	go t.download(client, tx)
 	return tx

@@ -153,6 +153,8 @@ func (ui *transfersUI) drawTransferStatus(gtx C, tx *transfer) D {
 		text = fmt.Sprintf("%s / %s (%s/s)", bytesString(tx.ReadBytes), bytesString(tx.Size), bytesString(tx.ReadSpeed))
 	case transferStatusError:
 		text = fmt.Sprintf("Error: %s", tx.Error)
+	case transferStatusDone:
+		text = fmt.Sprintf("%s (%s)", bytesString(tx.Size), tx.Created.Format(time.DateTime))
 	default:
 		text = bytesString(tx.Size)
 	}
