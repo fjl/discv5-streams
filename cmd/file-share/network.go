@@ -82,6 +82,7 @@ func newNetworkController(dataDirectory string, serve fileserver.ServerFunc) *ne
 		restartCh:   make(chan struct{}),
 		closeCh:     make(chan struct{}),
 	}
+	net.publishState(&networkState{loading: true})
 	net.wg.Add(1)
 	go net.loop()
 	return net
