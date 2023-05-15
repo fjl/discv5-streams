@@ -246,6 +246,7 @@ runMainLoop:
 		case <-fc.resetStateCh:
 			state = fileList{}
 			saveRequested = true
+			fc.publish(false, state, nil)
 
 		case <-fc.closeCh:
 			if saveDone != nil {
