@@ -99,7 +99,7 @@ func (ui *transfersUI) Layout(gtx C) D {
 func (ui *transfersUI) drawTransferList(gtx C, transfers []*transfer) D {
 	list := material.List(ui.theme, &ui.list)
 	return list.Layout(gtx, len(transfers), func(gtx C, index int) D {
-		tx := transfers[index]
+		tx := transfers[len(transfers)-1-index]
 		inset := layout.Inset{Top: 8, Bottom: 2, Left: 16, Right: 4}
 		if index == 0 {
 			inset.Top = 16
