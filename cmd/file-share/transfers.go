@@ -259,6 +259,7 @@ func (t *transfersController) mainLoop(state transfersState, client *fileserver.
 
 		case <-t.resetStateCh:
 			state.reset()
+			t.publishState(state)
 			saveRequested = true
 
 		case <-t.closeCh:
