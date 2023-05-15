@@ -26,6 +26,7 @@ type transfersController struct {
 	updateCh     chan *transfer
 	retryLoadCh  chan struct{}
 	resetStateCh chan struct{}
+	modifyCh     chan transferListModify
 	clientCh     chan *fileserver.Client
 	closeCh      chan struct{}
 	rootContext  context.Context
@@ -75,6 +76,12 @@ type transfer struct {
 	Error     string
 }
 
+func (t *transfer) isDone() bool {
+	return t.Status == transferStatusDone || t.Status == transferStatusError
+}
+
+type transferListModify func([]*transfer) []*transfer
+
 func newTransfersController(net *networkController, stateFile string) *transfersController {
 	t := &transfersController{
 		stateFile:    stateFile,
@@ -83,6 +90,7 @@ func newTransfersController(net *networkController, stateFile string) *transfers
 		clientCh:     make(chan *fileserver.Client),
 		startCh:      make(chan fileserver.TransferRef),
 		updateCh:     make(chan *transfer),
+		modifyCh:     make(chan transferListModify),
 		retryLoadCh:  make(chan struct{}),
 		resetStateCh: make(chan struct{}),
 		closeCh:      make(chan struct{}),
@@ -129,10 +137,30 @@ func (t *transfersController) ResetState() {
 	}
 }
 
+// ClearCompleted removes completed transfers from the list.
+func (t *transfersController) ClearCompleted() {
+	t.modify(func(list []*transfer) []*transfer {
+		var newlist []*transfer
+		for _, tx := range list {
+			if !tx.isDone() {
+				newlist = append(newlist, tx)
+			}
+		}
+		return newlist
+	})
+}
+
 // StartTransfer starts a file download.
 func (t *transfersController) StartTransfer(ref fileserver.TransferRef) {
 	select {
 	case t.startCh <- ref:
+	case <-t.closeCh:
+	}
+}
+
+func (t *transfersController) modify(mod transferListModify) {
+	select {
+	case t.modifyCh <- mod:
 	case <-t.closeCh:
 	}
 }
@@ -210,10 +238,14 @@ func (t *transfersController) mainLoop(state transfersState, client *fileserver.
 		case tx := <-t.updateCh:
 			state.update(tx)
 			t.publishState(state)
-			switch tx.Status {
-			case transferStatusDone, transferStatusError:
+			if tx.isDone() {
 				saveRequested = true
 			}
+
+		case fn := <-t.modifyCh:
+			state.list = fn(state.list)
+			t.publishState(state)
+			saveRequested = true
 
 		case <-saveDone:
 			state.wasReset = false
@@ -301,7 +333,7 @@ func (t *transfersController) saveList(list []*transfer) error {
 	// Remove in-progress transfers from list.
 	savedList := make([]*transfer, 0, len(list))
 	for _, tx := range list {
-		if tx.Status == transferStatusDone || tx.Status == transferStatusError {
+		if tx.isDone() {
 			savedList = append(savedList, tx)
 		}
 	}
