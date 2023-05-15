@@ -11,10 +11,21 @@ import (
 	"github.com/fjl/discv5-streams/sharedsocket"
 )
 
+// Config is the configuration of Host.
 type Config struct {
-	Discovery discover.Config
+	ListenAddr string
+	NodeDB     string // Path to node database directory.
+	Discovery  discover.Config
 }
 
+var ConfigForTesting = Config{
+	ListenAddr: "127.0.0.1:0",
+	Discovery: discover.Config{
+		Bootnodes: []*enode.Node{}, // disable bootstrap
+	},
+}
+
+// Host manages the p2p networking stack.
 type Host struct {
 	Socket       *sharedsocket.Conn
 	LocalNode    *enode.LocalNode
@@ -22,7 +33,13 @@ type Host struct {
 	SessionStore *session.Store
 }
 
-func Listen(addr string, cfg Config) (*Host, error) {
+// Listen creates a UDP listener on the configured address, and sets up the p2p
+// networking stack.
+func Listen(cfg Config) (*Host, error) {
+	// Assign config defaults.
+	if cfg.ListenAddr == "" {
+		cfg.ListenAddr = ":0"
+	}
 	if cfg.Discovery.PrivateKey == nil {
 		ethlog.Info("Generating new node key")
 		key, err := crypto.GenerateKey()
@@ -31,18 +48,18 @@ func Listen(addr string, cfg Config) (*Host, error) {
 		}
 		cfg.Discovery.PrivateKey = key
 	}
-
 	if cfg.Discovery.Bootnodes == nil {
 		cfg.Discovery.Bootnodes = parseDefaultBootnodes()
 	}
 
-	conn, err := sharedsocket.Listen("udp4", addr)
+	// Listen.
+	conn, err := sharedsocket.Listen("udp4", cfg.ListenAddr)
 	if err != nil {
 		return nil, err
 	}
 
 	// Configure LocalNode.
-	db, _ := enode.OpenDB("")
+	db, _ := enode.OpenDB(cfg.NodeDB)
 	ln := enode.NewLocalNode(db, cfg.Discovery.PrivateKey)
 	laddr := conn.LocalAddr().(*net.UDPAddr)
 	if laddr.IP.IsUnspecified() {
@@ -52,6 +69,7 @@ func Listen(addr string, cfg Config) (*Host, error) {
 	}
 	ln.SetFallbackUDP(laddr.Port)
 
+	// Configure discovery.
 	discoverConn := conn.DefaultConn()
 	disc, err := discover.ListenV5(discoverConn, ln, cfg.Discovery)
 	if err != nil {
@@ -59,6 +77,7 @@ func Listen(addr string, cfg Config) (*Host, error) {
 		return nil, err
 	}
 
+	// Configure session system.
 	sessionStore := session.NewStore()
 	conn.AddHandler(sessionStore)
 

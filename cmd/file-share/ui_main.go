@@ -9,6 +9,7 @@ import (
 	"gioui.org/widget/material"
 	"gioui.org/x/component"
 	"gioui.org/x/explorer"
+	"github.com/fjl/discv5-streams/host"
 	"golang.org/x/exp/shiny/materialdesign/icons"
 )
 
@@ -18,14 +19,15 @@ type appState struct {
 	transfers *transfersController
 }
 
-func newAppState(dataDir string) *appState {
+func newAppState(dataDir string, config host.Config) *appState {
 	const appName = "discv5-fileshare"
 	fileSpaceFile := filepath.Join(dataDir, appName, "fileSpace.gob")
 	transfersFile := filepath.Join(dataDir, appName, "transfers.gob")
 	networkDir := filepath.Join(dataDir, appName, "network")
+	config.NodeDB = filepath.Join(networkDir, "nodes")
 
 	files := newFilesController(fileSpaceFile)
-	net := newNetworkController(networkDir, files.ServeFile)
+	net := newNetworkController(networkDir, &config, files.ServeFile)
 	st := &appState{
 		net:       net,
 		fs:        files,

@@ -36,12 +36,12 @@ type testSetup struct {
 }
 
 func newTestSetup(t *testing.T) *testSetup {
-	host1, err := host.Listen("127.0.0.1:0", host.Config{})
+	host1, err := host.Listen(host.ConfigForTesting)
 	if err != nil {
 		t.Fatal("listen error:", err)
 	}
 
-	host2, err := host.Listen("127.0.0.1:0", host.Config{})
+	host2, err := host.Listen(host.ConfigForTesting)
 	if err != nil {
 		host1.Close()
 		t.Fatal("listen error:", err)

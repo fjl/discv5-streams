@@ -34,6 +34,7 @@ func main() {
 	// Load node key, if requested. Otherwise a new key will be generated
 	// by the host.
 	var hostconfig host.Config
+	hostconfig.ListenAddr = *listenAddr
 	if *keyFile != "" {
 		key, err := crypto.LoadECDSA(*keyFile)
 		if err != nil {
@@ -44,7 +45,7 @@ func main() {
 	}
 
 	// Create the host.
-	host, err := host.Listen(*listenAddr, hostconfig)
+	host, err := host.Listen(hostconfig)
 	if err != nil {
 		log.Fatalf("can't listen: %v", err)
 		return

@@ -19,6 +19,7 @@ import (
 // networkController is the networkController connection state.
 type networkController struct {
 	datadir     string
+	hostConfig  *host.Config
 	serveFunc   fileserver.ServerFunc
 	state       atomic.Pointer[networkState]
 	changeCh    chan struct{}
@@ -73,9 +74,10 @@ func (net *networkController) Changed() <-chan struct{} {
 	return net.changeCh
 }
 
-func newNetworkController(dataDirectory string, serve fileserver.ServerFunc) *networkController {
+func newNetworkController(dataDirectory string, config *host.Config, serve fileserver.ServerFunc) *networkController {
 	net := &networkController{
 		datadir:     dataDirectory,
+		hostConfig:  config,
 		serveFunc:   serve,
 		changeCh:    make(chan struct{}, 1),
 		setClientCh: make(chan chan<- *fileserver.Client),
@@ -130,17 +132,20 @@ restart:
 }
 
 func (net *networkController) start() (*host.Host, *fileserver.Client, error) {
+	cfg := *net.hostConfig
+
 	// Load node key, if requested. Otherwise, generate a new one and
 	// store it for next time.
-	var hostconfig host.Config
-
-	key, err := net.getNodeKey()
-	if err != nil {
-		return nil, nil, err
+	if cfg.Discovery.PrivateKey == nil {
+		key, err := net.getNodeKey()
+		if err != nil {
+			return nil, nil, err
+		}
+		cfg.Discovery.PrivateKey = key
 	}
-	hostconfig.Discovery.PrivateKey = key
 
-	host, err := host.Listen(":0", hostconfig)
+	// Create the host.
+	host, err := host.Listen(cfg)
 	if err != nil {
 		log.Printf("can't listen: %v", err)
 		return nil, nil, err

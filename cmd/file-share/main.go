@@ -13,6 +13,7 @@ import (
 	"gioui.org/widget/material"
 	"gioui.org/x/explorer"
 	ethlog "github.com/ethereum/go-ethereum/log"
+	"github.com/fjl/discv5-streams/host"
 )
 
 func main() {
@@ -35,7 +36,7 @@ func main() {
 	// Set up go-ethereum logging.
 	h := ethlog.LvlFilterHandler(ethlog.LvlTrace, ethlog.StreamHandler(os.Stderr, ethlog.TerminalFormat(false)))
 	ethlog.Root().SetHandler(h)
-	state := newAppState(dataDir)
+	state := newAppState(dataDir, host.Config{})
 
 	var (
 		title    = app.Title("FileShare")

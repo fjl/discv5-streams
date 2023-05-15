@@ -3,11 +3,13 @@ package main
 import (
 	"testing"
 	"time"
+
+	"github.com/fjl/discv5-streams/host"
 )
 
 func TestAppStateSetup(t *testing.T) {
 	tmp := t.TempDir()
-	state := newAppState(tmp)
+	state := newAppState(tmp, host.ConfigForTesting)
 	defer state.Close()
 
 	var (
